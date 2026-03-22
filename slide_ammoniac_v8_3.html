@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Tổng Hợp Amoniac – Plasma Microreactor</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ── tokens ── */
+:root{
+  --navy:#061525;--deep:#0a2040;--card:rgba(255,255,255,.046);
+  --bord:rgba(0,210,230,.2);--cyan:#00c8dc;--teal:#00e0c0;
+  --w:#e8f4fc;
+  --mu:#9bbccc;   /* ↑ brighter than #6a9aaa for dark bg */
+  --ac:#f0d060;
+  --ff:'DM Sans',sans-serif;--mo:'DM Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center;font-family:var(--ff);}
+#stage{width:1280px;height:720px;position:fixed;overflow:hidden;transform-origin:top left;}
+
+/* ── slide shell — reduced padding ── */
+.slide{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  padding:28px 44px 28px;          /* was 38 54 32 */
+  background:var(--navy);overflow:hidden;
+  opacity:0;pointer-events:none;
+  transform:translateX(36px);
+  transition:opacity .38s cubic-bezier(.4,0,.2,1),transform .38s cubic-bezier(.4,0,.2,1);
+}
+.slide.active{opacity:1;pointer-events:auto;transform:translateX(0);}
+.slide.exit{opacity:0;transform:translateX(-36px);}
+.slide::before{content:'';position:absolute;inset:0;pointer-events:none;z-index:0;
+  background-image:linear-gradient(rgba(0,210,230,.028) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,210,230,.028) 1px,transparent 1px);
+  background-size:48px 48px;}
+.glow{position:absolute;border-radius:50%;pointer-events:none;filter:blur(88px);z-index:0;}
+.slide>*{position:relative;z-index:1;}
+
+/* ── entrance animations ── */
+@keyframes fu{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+@keyframes sc{from{opacity:0;transform:scale(.89)}to{opacity:1;transform:scale(1)}}
+@keyframes fi{from{opacity:0}to{opacity:1}}
+@keyframes pp{0%,100%{opacity:.48;transform:scale(1)}50%{opacity:1;transform:scale(1.045)}}
+
+.a{opacity:0;}
+.slide.active .a{animation:fu .48s cubic-bezier(.22,.8,.4,1) both;animation-delay:calc(var(--i,0)*.11s);}
+.slide.active .as{animation:sc .46s cubic-bezier(.22,.8,.4,1) both;animation-delay:calc(var(--i,0)*.11s);}
+.slide.active .af{animation:fi .55s ease both;animation-delay:calc(var(--i,0)*.11s);}
+.bl li{opacity:0;}
+.slide.active .bl li:nth-child(1){animation:fu .4s .26s cubic-bezier(.22,.8,.4,1) both;}
+.slide.active .bl li:nth-child(2){animation:fu .4s .39s cubic-bezier(.22,.8,.4,1) both;}
+.slide.active .bl li:nth-child(3){animation:fu .4s .52s cubic-bezier(.22,.8,.4,1) both;}
+.slide.active .bl li:nth-child(4){animation:fu .4s .65s cubic-bezier(.22,.8,.4,1) both;}
+.slide.active .bl li:nth-child(5){animation:fu .4s .78s cubic-bezier(.22,.8,.4,1) both;}
+
+/* ── type ── */
+.lbl{font-size:10.5px;letter-spacing:3.5px;text-transform:uppercase;color:var(--cyan);font-weight:600;
+  display:flex;align-items:center;gap:10px;margin-bottom:9px;flex-shrink:0;}
+.lbl::after{content:'';flex:1;height:1px;background:linear-gradient(to right,rgba(0,210,230,.48),transparent);}
+h1{font-size:50px;font-weight:800;line-height:1.1;color:var(--w);}
+h2{font-size:30px;font-weight:700;line-height:1.18;color:var(--w);margin-bottom:12px;flex-shrink:0;}
+.hl{color:var(--cyan);}.hl2{color:var(--teal);}.ac{color:var(--ac);}
+p,li{font-size:14.5px;line-height:1.54;color:var(--w);}
+strong{font-weight:600;}
+
+/* ── card ── */
+.c{background:var(--card);border:1px solid var(--bord);border-radius:10px;padding:14px 18px;backdrop-filter:blur(4px);}
+.ct{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--cyan);font-weight:600;margin-bottom:8px;}
+.bl{list-style:none;display:flex;flex-direction:column;gap:7px;}
+.bl li{display:flex;gap:8px;align-items:flex-start;font-size:14.5px;}
+.bl li::before{content:'▸';color:var(--cyan);flex-shrink:0;margin-top:2px;font-size:11px;}
+
+/* ── formula ── */
+.fb{background:linear-gradient(135deg,rgba(0,200,220,.11),rgba(0,224,192,.04));
+  border:1px solid rgba(0,200,220,.38);border-radius:10px;
+  padding:18px 24px;   /* was 14 22 */
+  font-family:var(--mo);font-size:20px;color:var(--w);text-align:center;letter-spacing:.5px;}
+.fb small{display:block;font-family:var(--ff);font-size:12.5px;color:var(--mu);margin-top:5px;}
+
+/* ── pill ── */
+.pill{display:inline-block;background:rgba(0,200,220,.1);border:1px solid rgba(0,200,220,.26);
+  color:var(--cyan);border-radius:20px;padding:2px 10px;font-size:11.5px;font-weight:600;}
+
+/* ── step badge ── */
+.sb{width:25px;height:25px;border-radius:50%;flex-shrink:0;
+  background:linear-gradient(135deg,var(--cyan),var(--teal));
+  color:var(--navy);font-weight:700;font-size:12px;
+  display:flex;align-items:center;justify-content:center;}
+.mo{font-family:var(--mo);font-size:13px;color:var(--teal);}
+
+/* ── grids — always stretch both cols to same height ── */
+.g2 {display:grid;grid-template-columns:1fr 1fr;gap:13px;align-items:stretch;}
+.g3 {display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-items:stretch;}
+.g55{display:grid;grid-template-columns:1.1fr .9fr;gap:15px;align-items:stretch;}
+.g45{display:grid;grid-template-columns:.85fr 1.15fr;gap:15px;align-items:stretch;}
+.col{display:flex;flex-direction:column;gap:12px;}
+
+/* ── SVG containers — always fill their cell ── */
+.as{flex:1;width:100%;height:100%;display:flex;align-items:stretch;justify-content:center;}
+.as svg{width:100%;height:100%;}
+
+/* ── page num ── */
+.pg{position:absolute;bottom:10px;right:18px;font-family:var(--mo);font-size:11px;color:var(--mu);z-index:10;}
+
+/* ── nav ── */
+#nav{position:fixed;bottom:0;left:0;right:0;height:36px;z-index:999;background:rgba(0,0,0,.9);
+  border-top:1px solid rgba(0,210,230,.13);display:flex;align-items:center;justify-content:center;gap:14px;}
+.nb{font-family:var(--ff);font-size:12px;color:var(--cyan);background:rgba(0,200,220,.09);
+  border:1px solid rgba(0,200,220,.25);border-radius:4px;padding:4px 18px;cursor:pointer;transition:background .2s;}
+.nb:hover{background:rgba(0,200,220,.2);}
+#dots{display:flex;gap:6px;align-items:center;}
+.dot{width:8px;height:8px;border-radius:50%;border:1.5px solid rgba(0,200,220,.3);cursor:pointer;transition:all .22s;}
+.dot.on{background:var(--cyan);border-color:var(--cyan);box-shadow:0 0 6px var(--cyan);}
+#si{font-family:var(--mo);font-size:11px;color:var(--mu);min-width:50px;text-align:center;}
+
+/* ── bar chart ── */
+@keyframes barGrow{from{transform:scaleY(0);transform-origin:bottom}to{transform:scaleY(1);transform-origin:bottom}}
+.bar-r{transform:scaleY(0);transform-origin:bottom;}
+.slide.active .bar-r.b1{animation:barGrow .65s .28s cubic-bezier(.22,.8,.4,1) both;}
+.slide.active .bar-r.b2{animation:barGrow .65s .52s cubic-bezier(.22,.8,.4,1) both;}
+</style>
+</head>
+<body>
+<div id="stage">
+
+
+<!-- ═══════════════════════════════════════
+  S1 — TITLE
+═══════════════════════════════════════ -->
+<div class="slide active" id="s0">
+  <div class="glow" style="width:800px;height:800px;background:rgba(0,200,220,.10);top:-260px;right:-180px;"></div>
+  <div class="glow" style="width:560px;height:560px;background:rgba(0,224,192,.08);bottom:-160px;left:-100px;"></div>
+
+  <div class="lbl a" style="--i:0">Giới thiệu</div>
+
+  <div class="g55" style="flex:1;align-items:center;">
+    <!-- LEFT col -->
+    <div class="col" style="flex:1;justify-content:center;gap:20px;padding-right:10px;">
+      <h1 class="a" style="--i:1;font-size:62px;line-height:1.08;">
+        Công Nghệ<br>
+        Tổng Hợp <span class="hl">Amoniac</span><br>
+        bằng <span class="hl2">Plasma</span><br>
+        <span class="hl2">Microreactor</span>
+      </h1>
+      <p class="a" style="--i:2;color:var(--mu);font-size:17px;max-width:520px;line-height:1.6;">
+        Kích hoạt phản ứng tổng hợp amoniac bằng plasma ở áp suất khí quyển, thay thế điều kiện nhiệt độ cao và áp suất lớn của quy trình Haber–Bosch.
+      </p>
+      <div class="a" style="--i:3;">
+        <div class="fb" style="font-size:30px;padding:22px 28px;">
+          3H₂ + N₂ ⇌ 2NH₃
+          <small style="font-size:16px;margin-top:9px;">ΔH<sub>298K</sub> = −46.35 kJ/mol &nbsp;·&nbsp; Tỏa nhiệt, thuận nghịch</small>
+        </div>
+      </div>
+      <div class="a" style="--i:4;display:flex;gap:8px;flex-wrap:wrap;">
+        <span class="pill" style="font-size:13px;padding:4px 14px;">plasma</span>
+        <span class="pill" style="font-size:13px;padding:4px 14px;">DBD</span>
+        <span class="pill" style="font-size:13px;padding:4px 14px;">Ru/MCM-41</span>
+        <span class="pill" style="font-size:13px;padding:4px 14px;">microreactor</span>
+        <span class="pill" style="font-size:13px;padding:4px 14px;">vibrational excitation</span>
+      </div>
+    </div>
+
+    <!-- RIGHT: molecular diagram, fills cell -->
+    <div class="as" style="--i:2;">
+      <svg viewBox="0 0 380 480" style="width:100%;height:100%;max-height:640px;">
+        <defs>
+          <radialGradient id="rg" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#00c8dc" stop-opacity=".28"/>
+            <stop offset="100%" stop-color="#00c8dc" stop-opacity="0"/>
+          </radialGradient>
+          <linearGradient id="lg" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#00c8dc" stop-opacity="0"/>
+            <stop offset="50%" stop-color="#00c8dc"/>
+            <stop offset="100%" stop-color="#00e0c0" stop-opacity="0"/>
+          </linearGradient>
+          <marker id="arm" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8Z" fill="#00e0c0"/></marker>
+        </defs>
+        <ellipse cx="190" cy="120" rx="165" ry="44" fill="none" stroke="url(#lg)" stroke-width="2.5" style="animation:pp 2.5s infinite"/>
+        <circle cx="190" cy="120" r="86" fill="url(#rg)" style="animation:pp 2.5s .5s infinite"/>
+        <circle cx="155" cy="120" r="30" fill="rgba(0,200,220,.18)" stroke="#00c8dc" stroke-width="2.5"/>
+        <circle cx="225" cy="120" r="30" fill="rgba(0,200,220,.18)" stroke="#00c8dc" stroke-width="2.5"/>
+        <line x1="168" y1="113" x2="212" y2="113" stroke="#00c8dc" stroke-width="3"/>
+        <line x1="168" y1="120" x2="212" y2="120" stroke="#00c8dc" stroke-width="3"/>
+        <line x1="168" y1="127" x2="212" y2="127" stroke="#00c8dc" stroke-width="3"/>
+        <text x="149" y="125" font-family="DM Mono" font-size="17" fill="#00c8dc" text-anchor="middle">N</text>
+        <text x="231" y="125" font-family="DM Mono" font-size="17" fill="#00c8dc" text-anchor="middle">N</text>
+        <text x="96" y="124" font-family="DM Sans" font-size="16" fill="rgba(0,200,220,.75)">N₂</text>
+        <text x="190" y="52" font-family="DM Sans" font-size="14" fill="#9bbccc" text-anchor="middle">Liên kết ba — ~945 kJ/mol</text>
+        <line x1="190" y1="56" x2="190" y2="68" stroke="rgba(155,188,204,.4)" stroke-width="1" stroke-dasharray="3,2"/>
+        <line x1="190" y1="160" x2="190" y2="206" stroke="rgba(0,224,192,.8)" stroke-width="2.5" marker-end="url(#arm)"/>
+        <rect x="210" y="172" width="88" height="24" rx="6" fill="rgba(0,224,192,.12)" stroke="rgba(0,224,192,.35)" stroke-width="1.2"/>
+        <text x="254" y="189" font-family="DM Sans" font-size="13" fill="#00e0c0" text-anchor="middle">⚡ plasma</text>
+        <circle cx="190" cy="278" r="50" fill="rgba(0,224,192,.16)" stroke="#00e0c0" stroke-width="2.5" style="animation:pp 2.2s .8s infinite"/>
+        <text x="190" y="272" font-family="DM Mono" font-size="22" fill="#00e0c0" text-anchor="middle">NH₃</text>
+        <text x="190" y="296" font-family="DM Sans" font-size="15" fill="#9bbccc" text-anchor="middle">amoniac</text>
+        <circle cx="60" cy="264" r="28" fill="rgba(240,208,96,.14)" stroke="#f0d060" stroke-width="1.8"/>
+        <text x="60" y="270" font-family="DM Mono" font-size="16" fill="#f0d060" text-anchor="middle">H₂</text>
+        <circle cx="320" cy="264" r="28" fill="rgba(240,208,96,.14)" stroke="#f0d060" stroke-width="1.8"/>
+        <text x="320" y="270" font-family="DM Mono" font-size="16" fill="#f0d060" text-anchor="middle">H₂</text>
+        <line x1="88" y1="268" x2="142" y2="272" stroke="rgba(240,208,96,.45)" stroke-width="1.5" stroke-dasharray="5,3"/>
+        <line x1="292" y1="268" x2="238" y2="272" stroke="rgba(240,208,96,.45)" stroke-width="1.5" stroke-dasharray="5,3"/>
+        <rect x="106" y="350" width="168" height="46" rx="9" fill="rgba(0,224,192,.14)" stroke="rgba(0,224,192,.42)" stroke-width="1.5"/>
+        <text x="190" y="368" font-family="DM Sans" font-size="15" fill="#00e0c0" text-anchor="middle" font-weight="700">Ru / MCM-41</text>
+        <text x="190" y="387" font-family="DM Sans" font-size="14" fill="#9bbccc" text-anchor="middle">+30% NH₃ yield</text>
+        <rect x="50" y="412" width="280" height="44" rx="10" fill="rgba(0,200,220,.10)" stroke="rgba(0,200,220,.32)" stroke-width="1.2"/>
+        <text x="190" y="430" font-family="DM Mono" font-size="16" fill="#00c8dc" text-anchor="middle">3H₂ + N₂ ⇌ 2NH₃</text>
+        <text x="190" y="448" font-family="DM Sans" font-size="13" fill="#9bbccc" text-anchor="middle">ΔH₂₉₈ₖ = −46.35 kJ/mol</text>
+      </svg>
+    </div>
+  </div>
+  <div class="pg">1 / 8</div>
+</div>
+
+
+<!-- ═══════════════════════════════════════
+  S2 — VẤN ĐỀ & GIẢI PHÁP
+═══════════════════════════════════════ -->
+<div class="slide" id="s1">
+  <div class="glow" style="width:700px;height:700px;background:rgba(0,224,192,.09);bottom:-180px;right:-120px;"></div>
+  <div class="glow" style="width:400px;height:400px;background:rgba(0,200,220,.07);top:-120px;left:-60px;"></div>
+
+  <div class="lbl a" style="--i:0">Vấn đề &amp; Giải pháp</div>
+  <h2 class="a" style="--i:1;font-size:34px;">
+    <span style="color:#ff8080;">N₂ bền vững</span>
+    <span style="color:var(--mu);font-weight:300;"> — </span>
+    <span class="hl2">Plasma hoạt hóa</span>
+  </h2>
+
+  <div class="g2" style="flex:1;align-items:stretch;">
+    <!-- LEFT col: 2 cards, each flex:1 -->
+    <div class="col" style="justify-content:stretch;gap:14px;">
+      <div class="c a" style="--i:2;flex:1;min-height:0;border-color:rgba(220,80,80,.28);">
+        <div class="ct" style="color:#ff8080;font-size:11px;letter-spacing:2.5px;margin-bottom:12px;">⚡ Thách thức</div>
+        <ul class="bl" style="gap:14px;">
+          <li style="font-size:16px;line-height:1.55;">N₂ có liên kết ba <strong>cực bền</strong> — năng lượng liên kết <strong class="ac">~945 kJ/mol</strong></li>
+          <li style="font-size:16px;line-height:1.55;">Haber–Bosch cần <strong>400–500°C, 150–300 atm</strong> — tốn năng lượng, quy mô lớn</li>
+          <li style="font-size:16px;line-height:1.55;">Không tích hợp được <strong>năng lượng tái tạo</strong>, không phù hợp sản xuất phân tán</li>
+        </ul>
+      </div>
+      <div class="c a" style="--i:3;flex:1;min-height:0;border-color:rgba(0,224,192,.32);">
+        <div class="ct" style="color:var(--teal);font-size:11px;letter-spacing:2.5px;margin-bottom:12px;">✦ Giải pháp: Plasma</div>
+        <ul class="bl" style="gap:14px;">
+          <li style="font-size:16px;line-height:1.55;">Tạo <strong>electron năng lượng cao</strong> kích thích và phân ly N₂ thành gốc tự do</li>
+          <li style="font-size:16px;line-height:1.55;">N₂ vào <strong>vibrational excitation</strong> — liên kết bị làm yếu, không cần nhiệt</li>
+          <li style="font-size:16px;line-height:1.55;">Hoạt động ở <strong>áp suất khí quyển</strong>, bật tắt linh hoạt, tích hợp tái tạo được</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- RIGHT: energy comparison SVG fills cell -->
+    <div class="as" style="--i:2;min-height:380px;">
+      <svg viewBox="0 0 500 460">
+        <defs>
+          <linearGradient id="bred" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#e07070"/><stop offset="100%" stop-color="#b04040"/>
+          </linearGradient>
+          <linearGradient id="bcyan" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#00c8dc"/><stop offset="100%" stop-color="#00e0c0"/>
+          </linearGradient>
+        </defs>
+        <text x="18" y="30" font-family="DM Sans" font-size="14" fill="#9bbccc">N≡N liên kết ba</text>
+        <rect x="18" y="36" width="390" height="36" rx="7" fill="url(#bred)" opacity=".88"/>
+        <text x="422" y="62" font-family="DM Mono" font-size="26" fill="#f0d060" font-weight="600">945</text>
+        <text x="422" y="80" font-family="DM Sans" font-size="13" fill="#9bbccc">kJ/mol</text>
+        <text x="18" y="100" font-family="DM Sans" font-size="14" fill="#9bbccc">Haber–Bosch</text>
+        <rect x="18" y="106" width="280" height="30" rx="6" fill="rgba(180,100,60,.6)" stroke="rgba(220,130,80,.4)" stroke-width="1"/>
+        <text x="308" y="126" font-family="DM Mono" font-size="13" fill="rgba(220,150,80,.9)">400–500°C · 300 atm</text>
+        <line x1="18" y1="158" x2="478" y2="158" stroke="rgba(0,210,230,.16)" stroke-width="1"/>
+        <text x="248" y="154" font-family="DM Sans" font-size="13" fill="#9bbccc" text-anchor="middle">vs plasma e⁻</text>
+        <text x="18" y="180" font-family="DM Sans" font-size="14" fill="#9bbccc">e⁻ plasma</text>
+        <rect x="18" y="186" width="160" height="30" rx="6" fill="url(#bcyan)" opacity=".88"/>
+        <text x="188" y="206" font-family="DM Mono" font-size="14" fill="#00c8dc">~1–5 eV</text>
+        <rect x="18" y="234" width="468" height="96" rx="11" fill="rgba(0,200,220,.08)" stroke="rgba(0,200,220,.30)" stroke-width="1.2"/>
+        <text x="252" y="264" font-family="DM Sans" font-size="18" fill="var(--cyan)" font-weight="700" text-anchor="middle">Vibrational excitation</text>
+        <text x="252" y="288" font-family="DM Sans" font-size="15" fill="#e8f4fc" text-anchor="middle">Plasma đưa N₂ vào trạng thái kích thích rung</text>
+        <text x="252" y="310" font-family="DM Sans" font-size="15" fill="#e8f4fc" text-anchor="middle">→ liên kết yếu dần · không cần nhiệt độ cao</text>
+        <text x="30" y="358" font-family="DM Sans" font-size="13" fill="#9bbccc">N₂ ổn định</text>
+        <circle cx="72"  cy="388" r="18" fill="rgba(106,154,170,.22)" stroke="#6a9aaa" stroke-width="1.5"/>
+        <circle cx="112" cy="388" r="18" fill="rgba(106,154,170,.22)" stroke="#6a9aaa" stroke-width="1.5"/>
+        <line x1="82" y1="382" x2="102" y2="382" stroke="#6a9aaa" stroke-width="2.2"/>
+        <line x1="82" y1="388" x2="102" y2="388" stroke="#6a9aaa" stroke-width="2.2"/>
+        <line x1="82" y1="394" x2="102" y2="394" stroke="#6a9aaa" stroke-width="2.2"/>
+        <text x="152" y="393" font-family="DM Sans" font-size="22" fill="var(--cyan)">→</text>
+        <text x="188" y="358" font-family="DM Sans" font-size="13" fill="#00e0c0">Kích thích rung</text>
+        <circle cx="224" cy="388" r="20" fill="rgba(0,224,192,.18)" stroke="#00e0c0" stroke-width="1.8" style="animation:pp 1.6s infinite"/>
+        <circle cx="268" cy="388" r="20" fill="rgba(0,224,192,.18)" stroke="#00e0c0" stroke-width="1.8" style="animation:pp 1.6s .4s infinite"/>
+        <line x1="238" y1="388" x2="254" y2="388" stroke="#00e0c0" stroke-width="1.8" stroke-dasharray="4,2"/>
+        <text x="316" y="393" font-family="DM Sans" font-size="22" fill="var(--cyan)">→</text>
+        <text x="352" y="358" font-family="DM Sans" font-size="13" fill="var(--teal)">N• tự do</text>
+        <circle cx="386" cy="388" r="18" fill="rgba(0,224,192,.28)" stroke="#00e0c0" stroke-width="2" style="animation:pp 1.4s .2s infinite"/>
+        <text x="382" y="393" font-family="DM Mono" font-size="14" fill="#00e0c0">N•</text>
+        <circle cx="428" cy="388" r="18" fill="rgba(0,224,192,.28)" stroke="#00e0c0" stroke-width="2" style="animation:pp 1.4s .6s infinite"/>
+        <text x="424" y="393" font-family="DM Mono" font-size="14" fill="#00e0c0">N•</text>
+      </svg>
+    </div>
+  </div>
+  <div class="pg">2 / 8</div>
+</div>
+
+
+<!-- ═══════════════════════════════════════
+  S3 — THIẾT BỊ
+═══════════════════════════════════════ -->
+<div class="slide" id="s2">
+  <div class="glow" style="width:480px;height:480px;background:rgba(0,200,220,.08);top:-100px;left:-60px;"></div>
+
+  <div class="lbl a" style="--i:0">Thiết bị</div>
+  <h2 class="a" style="--i:1">Cấu trúc <span class="hl">Lò Vi Phản Ứng</span> — Microreactor</h2>
+
+  <div class="g45" style="flex:1;">
+    <!-- LEFT: reactor SVG fills cell -->
+    <div class="as" style="--i:2;">
+      <svg viewBox="-30 0 390 570" style="max-height:600px;">
+        <rect x="30" y="14" width="280" height="520" rx="14" fill="rgba(10,32,64,.55)" stroke="#00c8dc" stroke-width="1.5"/>
+        <rect x="-28" y="42" width="54" height="24" rx="4" fill="rgba(0,200,220,.2)" stroke="#00c8dc" stroke-width="1"/>
+        <text x="-22" y="59" font-family="DM Mono" font-size="13" fill="#00c8dc">N₂ IN</text>
+        <rect x="-28" y="72" width="54" height="24" rx="4" fill="rgba(0,224,192,.2)" stroke="#00e0c0" stroke-width="1"/>
+        <text x="-22" y="89" font-family="DM Mono" font-size="13" fill="#00e0c0">H₂ IN</text>
+        <line x1="26" y1="54" x2="80" y2="140" stroke="#00c8dc" stroke-width="1" stroke-dasharray="4,2"/>
+        <line x1="26" y1="84" x2="80" y2="148" stroke="#00e0c0" stroke-width="1" stroke-dasharray="4,2"/>
+        <rect x="80" y="118" width="180" height="24" rx="4" fill="rgba(0,200,220,.07)" stroke="rgba(0,200,220,.2)" stroke-width=".8"/>
+        <text x="170" y="134" font-family="DM Sans" font-size="12" fill="#9bbccc" text-anchor="middle">Vùng trộn khí N₂ + H₂</text>
+        <rect x="68" y="143" width="204" height="26" rx="4" fill="rgba(240,208,96,.2)" stroke="#f0d060" stroke-width="1.2"/>
+        <text x="170" y="160" font-family="DM Sans" font-size="12" fill="#f0d060" text-anchor="middle" font-weight="600">▲ ▲ ▲  HV Electrode (kim tự tháp)  ▲ ▲ ▲</text>
+        <rect x="68" y="171" width="204" height="134" rx="6" fill="rgba(0,200,220,.05)" stroke="rgba(0,200,220,.4)" stroke-width="1" stroke-dasharray="5,3"/>
+        <ellipse cx="170" cy="226" rx="88" ry="38" fill="rgba(0,200,220,.14)" style="animation:pp 2.2s infinite"/>
+        <text x="90" y="186" font-family="DM Sans" font-size="11.5" fill="#00c8dc">Discharge Gap (0.5 mm – vài mm)</text>
+        <circle cx="104" cy="228" r="8" fill="rgba(0,224,192,.6)" stroke="#00e0c0" stroke-width="1"/>
+        <circle cx="128" cy="240" r="8" fill="rgba(0,224,192,.6)" stroke="#00e0c0" stroke-width="1"/>
+        <circle cx="152" cy="224" r="8" fill="rgba(0,224,192,.6)" stroke="#00e0c0" stroke-width="1"/>
+        <circle cx="176" cy="236" r="8" fill="rgba(0,224,192,.6)" stroke="#00e0c0" stroke-width="1"/>
+        <circle cx="200" cy="226" r="8" fill="rgba(0,224,192,.6)" stroke="#00e0c0" stroke-width="1"/>
+        <circle cx="224" cy="238" r="8" fill="rgba(0,224,192,.6)" stroke="#00e0c0" stroke-width="1"/>
+        <circle cx="248" cy="226" r="8" fill="rgba(0,224,192,.6)" stroke="#00e0c0" stroke-width="1"/>
+        <text x="170" y="287" font-family="DM Sans" font-size="11.5" fill="#00e0c0" text-anchor="middle">● MCM-41 phủ Ru — Catalyst Bed + DBD</text>
+        <rect x="68" y="307" width="204" height="20" rx="3" fill="rgba(106,154,170,.3)" stroke="#6a9aaa" stroke-width="1"/>
+        <text x="170" y="321" font-family="DM Sans" font-size="12" fill="#6a9aaa" text-anchor="middle">Ground Electrode (tấm phẳng)</text>
+        <rect x="68" y="329" width="204" height="18" rx="3" fill="rgba(255,160,60,.18)" stroke="rgba(255,180,80,.8)" stroke-width="1"/>
+        <text x="170" y="342" font-family="DM Sans" font-size="12" fill="rgba(255,200,100,1)" text-anchor="middle">Mica / Gốm — Vật liệu cách điện</text>
+        <!-- Vỏ thép không gỉ label — placed outside left of reactor body -->
+        <text x="-20" y="410" font-family="DM Sans" font-size="11" fill="#9bbccc" text-anchor="middle">Vỏ thép</text>
+        <text x="-20" y="426" font-family="DM Sans" font-size="11" fill="#9bbccc" text-anchor="middle">không gỉ</text>
+        <line x1="6" y1="418" x2="30" y2="418" stroke="rgba(0,210,230,.3)" stroke-width=".8"/>
+        <line x1="170" y1="348" x2="170" y2="462" stroke="rgba(0,224,192,.38)" stroke-width="1" stroke-dasharray="4,2"/>
+        <rect x="90" y="462" width="160" height="30" rx="6" fill="rgba(0,224,192,.18)" stroke="#00e0c0" stroke-width="1.2"/>
+        <text x="170" y="482" font-family="DM Mono" font-size="14" fill="#00e0c0" text-anchor="middle">NH₃ Outlet ↓</text>
+        <rect x="68" y="496" width="204" height="24" rx="4" fill="rgba(0,200,220,.07)" stroke="rgba(0,200,220,.2)" stroke-width=".8"/>
+        <text x="170" y="512" font-family="DM Sans" font-size="12" fill="#9bbccc" text-anchor="middle">Phân tích qua quang phổ / hệ hấp thụ</text>
+      </svg>
+    </div>
+
+    <!-- RIGHT: 5-point card, fills column -->
+    <div class="col" style="flex:1;justify-content:space-between;">
+      <div class="c a" style="--i:3;flex:1;">
+        <div class="ct" style="font-size:11px;margin-bottom:12px;">Cấu trúc tổng thể</div>
+        <ul class="bl" style="gap:20px;">
+          <li style="font-size:16px;line-height:1.55;"><strong>HV Electrode</strong> — đa kim tự tháp, tập trung điện trường tại đầu nhọn</li>
+          <li style="font-size:16px;line-height:1.55;"><strong>Discharge Gap 0.5 mm–vài mm</strong> — duy trì plasma ổn định, ngăn sparking</li>
+          <li style="font-size:16px;line-height:1.55;"><strong>MCM-41 / Ru</strong> — catalyst bed kiêm dielectric barrier (DBD), phân tán plasma đều</li>
+          <li style="font-size:16px;line-height:1.55;"><strong>Mica / Gốm</strong> — cách điện, cố định khoảng cách giữa hai cực</li>
+          <li style="font-size:16px;line-height:1.55;"><strong>Inlet N₂ + H₂</strong> → buồng phản ứng → <strong>Outlet NH₃</strong> → phân tích</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="pg">3 / 8</div>
+</div>
+
+
+<!-- ═══════════════════════════════════════
+  S4 — CƠ CHẾ VẬT LÝ
+═══════════════════════════════════════ -->
+<div class="slide" id="s3">
+  <div class="glow" style="width:500px;height:500px;background:rgba(0,200,220,.09);top:-80px;right:-80px;"></div>
+
+  <div class="lbl a" style="--i:0">Cơ chế vật lý</div>
+  <h2 class="a" style="--i:1;font-size:34px;">Cơ chế <span class="hl">Vật Lý</span>: Plasma Kích Hoạt N₂</h2>
+
+  <div class="g45" style="flex:1;">
+    <!-- LEFT: physics SVG fills cell -->
+    <div class="as" style="--i:2;">
+      <svg viewBox="0 0 320 530" style="max-height:570px;">
+        <polygon points="160,14 102,68 218,68" fill="rgba(240,208,96,.2)" stroke="#f0d060" stroke-width="1.5"/>
+        <polygon points="106,68 64,104 130,104" fill="rgba(240,208,96,.14)" stroke="#f0d060" stroke-width="1.2"/>
+        <polygon points="214,68 190,104 256,104" fill="rgba(240,208,96,.14)" stroke="#f0d060" stroke-width="1.2"/>
+        <text x="90" y="122" font-family="DM Sans" font-size="12.5" fill="#f0d060" font-weight="600">▲ HV Electrode (multi-pyramid)</text>
+        <circle cx="160" cy="74" r="5" fill="#00c8dc" style="animation:pp 1s infinite"/>
+        <line x1="160" y1="80" x2="138" y2="168" stroke="#00c8dc" stroke-width="1.3" stroke-dasharray="4,2"/>
+        <line x1="160" y1="80" x2="182" y2="172" stroke="#00c8dc" stroke-width="1.3" stroke-dasharray="4,2"/>
+        <text x="193" y="136" font-family="DM Mono" font-size="14" fill="#00c8dc">e⁻</text>
+        <text x="58"  y="136" font-family="DM Mono" font-size="14" fill="#00c8dc">e⁻</text>
+        <circle cx="136" cy="190" r="22" fill="rgba(0,200,220,.14)" stroke="#6a9aaa" stroke-width="1.8"/>
+        <circle cx="184" cy="190" r="22" fill="rgba(0,200,220,.14)" stroke="#6a9aaa" stroke-width="1.8"/>
+        <line x1="146" y1="184" x2="174" y2="184" stroke="#6a9aaa" stroke-width="2.2"/>
+        <line x1="146" y1="190" x2="174" y2="190" stroke="#6a9aaa" stroke-width="2.2"/>
+        <line x1="146" y1="196" x2="174" y2="196" stroke="#6a9aaa" stroke-width="2.2"/>
+        <text x="90" y="228" font-family="DM Sans" font-size="12.5" fill="#9bbccc">N₂ ổn định (liên kết ba)</text>
+        <path d="M68 258 q14,-11 28,0 q14,11 28,0 q14,-11 28,0 q14,11 28,0 q14,-11 28,0"
+          fill="none" stroke="#00c8dc" stroke-width="1.6" opacity=".75" style="animation:pp 1.7s .3s infinite"/>
+        <text x="68" y="280" font-family="DM Sans" font-size="12.5" fill="#00c8dc" font-weight="700">vibrational excitation</text>
+        <text x="68" y="298" font-family="DM Sans" font-size="11.5" fill="#9bbccc">Liên kết bị làm yếu — không cần nhiệt</text>
+        <line x1="160" y1="216" x2="160" y2="310" stroke="rgba(0,224,192,.6)" stroke-width="1.5"/>
+        <polygon points="155,306 165,306 160,316" fill="rgba(0,224,192,.6)"/>
+        <circle cx="116" cy="342" r="22" fill="rgba(0,224,192,.22)" stroke="#00e0c0" stroke-width="1.8" style="animation:pp 1.8s .5s infinite"/>
+        <text x="112" y="347" font-family="DM Mono" font-size="14" fill="#00e0c0">N•</text>
+        <circle cx="204" cy="342" r="22" fill="rgba(0,224,192,.22)" stroke="#00e0c0" stroke-width="1.8" style="animation:pp 1.8s .9s infinite"/>
+        <text x="200" y="347" font-family="DM Mono" font-size="14" fill="#00e0c0">N•</text>
+        <text x="70" y="384" font-family="DM Sans" font-size="12.5" fill="#00e0c0">Nguyên tử N tự do (radical)</text>
+        <text x="64" y="410" font-family="DM Sans" font-size="12.5" fill="#9bbccc">MCM-41 (DBD) — phân tán plasma đều</text>
+        <circle cx="88"  cy="430" r="7" fill="rgba(0,224,192,.5)" stroke="#00e0c0" stroke-width="1"/>
+        <circle cx="108" cy="440" r="7" fill="rgba(0,224,192,.5)" stroke="#00e0c0" stroke-width="1"/>
+        <circle cx="128" cy="428" r="7" fill="rgba(0,224,192,.5)" stroke="#00e0c0" stroke-width="1"/>
+        <circle cx="148" cy="438" r="7" fill="rgba(0,224,192,.5)" stroke="#00e0c0" stroke-width="1"/>
+        <circle cx="168" cy="428" r="7" fill="rgba(0,224,192,.5)" stroke="#00e0c0" stroke-width="1"/>
+        <circle cx="188" cy="438" r="7" fill="rgba(0,224,192,.5)" stroke="#00e0c0" stroke-width="1"/>
+        <circle cx="208" cy="428" r="7" fill="rgba(0,224,192,.5)" stroke="#00e0c0" stroke-width="1"/>
+        <circle cx="228" cy="438" r="7" fill="rgba(0,224,192,.5)" stroke="#00e0c0" stroke-width="1"/>
+        <rect x="60" y="458" width="200" height="16" rx="3" fill="rgba(106,154,170,.25)" stroke="#6a9aaa" stroke-width="1"/>
+        <text x="160" y="470" font-family="DM Sans" font-size="11.5" fill="#6a9aaa" text-anchor="middle">Ground Electrode</text>
+      </svg>
+    </div>
+
+    <!-- RIGHT: 5-step card, fills column -->
+    <div class="col" style="flex:1;justify-content:center;">
+      <div class="c a" style="--i:3;flex:1;padding:22px 24px;">
+        <div class="ct" style="font-size:11px;margin-bottom:14px;">Dòng năng lượng — 5 bước tuần tự</div>
+        <ul class="bl" style="gap:18px;">
+          <li style="font-size:16px;line-height:1.55;"><strong>① Điện trường tập trung</strong> — đầu nhọn kim tự tháp tạo field enhancement cực lớn</li>
+          <li style="font-size:16px;line-height:1.55;"><strong>② Electron được giải phóng &amp; gia tốc</strong> — điện áp cao đẩy e⁻ vào discharge gap</li>
+          <li style="font-size:16px;line-height:1.55;"><strong>③ Va chạm e⁻ với N₂ / H₂</strong> — năng lượng điện thay thế hoàn toàn nhiệt độ</li>
+          <li style="font-size:16px;line-height:1.55;"><strong>④ Vibrational excitation / phân ly</strong> — N₂ kích thích rung hoặc vỡ thành N• tự do</li>
+          <li style="font-size:16px;line-height:1.55;"><strong>⑤ DBD (MCM-41) ổn định plasma</strong> — phân tán đều, ngăn sparking, duy trì ở 1 atm</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="pg">4 / 8</div>
+</div>
+
+
+<!-- ═══════════════════════════════════════
+  S5 — CƠ CHẾ HÓA HỌC
+═══════════════════════════════════════ -->
+<div class="slide" id="s4">
+  <div class="glow" style="width:500px;height:500px;background:rgba(0,224,192,.08);bottom:-100px;left:-60px;"></div>
+
+  <div class="lbl a" style="--i:0">Cơ chế hóa học</div>
+  <h2 class="a" style="--i:1;font-size:32px;">Cơ chế <span class="hl2">Hóa Học</span>: Hiệp đồng Plasma &amp; <span class="hl">Ru/MCM-41</span></h2>
+
+  <div class="g55" style="flex:1;">
+    <!-- LEFT: 3 steps + note, gap:10px, each card flex:1 -->
+    <div class="col" style="gap:10px;">
+      <div class="c a" style="--i:2;flex:1;">
+        <div style="display:flex;gap:10px;align-items:flex-start;">
+          <div class="sb">1</div>
+          <div>
+            <strong class="hl" style="font-size:17px;">Hấp phụ</strong>
+            <p style="margin-top:5px;color:#9bbccc;font-size:15px;line-height:1.55;">N•, H•, gốc NH từ plasma bám lên bề mặt <strong style="color:var(--w);">Ru / MCM-41</strong></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="c a" style="--i:3;flex:1.8;">
+        <div style="display:flex;gap:10px;align-items:flex-start;">
+          <div class="sb">2</div>
+          <div style="width:100%;">
+            <strong class="hl2" style="font-size:17px;">Phản ứng bề mặt</strong>
+            <div style="margin-top:11px;display:flex;flex-direction:column;gap:9px;">
+              <div style="display:flex;align-items:center;gap:14px;background:rgba(0,200,220,.07);border-radius:7px;padding:9px 14px;">
+                <span style="font-family:var(--mo);font-size:17px;min-width:100px;color:var(--w);">N + H</span>
+                <span style="color:var(--cyan);font-size:24px;line-height:1;">→</span>
+                <span style="font-family:var(--mo);font-size:17px;color:var(--cyan);">NH</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:14px;background:rgba(0,200,220,.07);border-radius:7px;padding:9px 14px;">
+                <span style="font-family:var(--mo);font-size:17px;min-width:100px;color:var(--w);">NH + H</span>
+                <span style="color:var(--cyan);font-size:24px;line-height:1;">→</span>
+                <span style="font-family:var(--mo);font-size:17px;color:var(--cyan);">NH₂</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:14px;background:rgba(0,224,192,.12);border-radius:7px;padding:9px 14px;border:1px solid rgba(0,224,192,.28);">
+                <span style="font-family:var(--mo);font-size:17px;min-width:100px;color:var(--w);">NH₂ + H</span>
+                <span style="color:var(--teal);font-size:24px;line-height:1;">→</span>
+                <span style="font-family:var(--mo);font-size:18px;color:var(--teal);font-weight:600;">NH₃ ✓</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="c a" style="--i:4;flex:1;">
+        <div style="display:flex;gap:10px;align-items:flex-start;">
+          <div class="sb">3</div>
+          <div>
+            <strong class="hl" style="font-size:17px;">Giải hấp phụ</strong>
+            <p style="margin-top:5px;color:#9bbccc;font-size:15px;line-height:1.55;">NH₃ rời bề mặt Ru, thoát ra dạng khí qua <strong style="color:var(--w);">outlet</strong></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="a" style="--i:5;padding:9px 14px;border-radius:8px;border:1px solid rgba(240,208,96,.25);background:rgba(240,208,96,.04);">
+        <span style="font-size:14px;color:#9bbccc;">Kết luận: xúc tác Ru/MCM-41 tăng nồng độ NH₃ </span>
+        <strong class="ac" style="font-size:16px;">~30%</strong>
+        <span style="font-size:14px;color:#9bbccc;"> so với plasma đơn thuần</span>
+      </div>
+    </div>
+
+    <!-- RIGHT: flow SVG fills cell -->
+    <div class="as" style="--i:2;min-height:0;">
+      <svg viewBox="0 0 240 540" style="max-height:600px;">
+        <defs>
+          <marker id="a1" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8Z" fill="#00c8dc"/></marker>
+          <marker id="a2" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8Z" fill="#00e0c0"/></marker>
+        </defs>
+        <rect x="40" y="10" width="160" height="36" rx="8" fill="rgba(106,154,170,.18)" stroke="#6a9aaa" stroke-width="1.2"/>
+        <text x="120" y="34" font-family="DM Mono" font-size="16" fill="#9bbccc" text-anchor="middle">N₂ + H₂</text>
+        <line x1="120" y1="46" x2="120" y2="78" stroke="#00c8dc" stroke-width="1.5" marker-end="url(#a1)"/>
+        <rect x="20" y="78" width="200" height="50" rx="8" fill="rgba(0,200,220,.11)" stroke="#00c8dc" stroke-width="1.2"/>
+        <text x="120" y="99" font-family="DM Sans" font-size="15" fill="#00c8dc" text-anchor="middle" font-weight="600">⚡ Plasma</text>
+        <text x="120" y="118" font-family="DM Mono" font-size="13" fill="#00c8dc" text-anchor="middle">N•, H•, NH radicals</text>
+        <line x1="120" y1="128" x2="120" y2="158" stroke="#00c8dc" stroke-width="1.5" marker-end="url(#a1)"/>
+        <rect x="26" y="158" width="188" height="36" rx="7" fill="rgba(0,200,220,.07)" stroke="rgba(0,200,220,.28)" stroke-width="1"/>
+        <text x="120" y="172" font-family="DM Sans" font-size="13" fill="#00c8dc" text-anchor="middle" font-weight="600">① Hấp phụ</text>
+        <text x="120" y="188" font-family="DM Sans" font-size="12" fill="#9bbccc" text-anchor="middle">N•, H• bám lên bề mặt Ru</text>
+        <line x1="120" y1="194" x2="120" y2="224" stroke="#00c8dc" stroke-width="1.5" marker-end="url(#a1)"/>
+        <rect x="16" y="224" width="208" height="110" rx="8" fill="rgba(0,224,192,.1)" stroke="#00e0c0" stroke-width="1.2"/>
+        <text x="120" y="244" font-family="DM Sans" font-size="14" fill="#00e0c0" text-anchor="middle" font-weight="600">② Phản ứng bề mặt (Ru)</text>
+        <text x="120" y="268" font-family="DM Mono" font-size="14" fill="#e8f4fc" text-anchor="middle">N + H  →  NH</text>
+        <text x="120" y="290" font-family="DM Mono" font-size="14" fill="#e8f4fc" text-anchor="middle">NH + H  →  NH₂</text>
+        <text x="120" y="315" font-family="DM Mono" font-size="15" fill="#00e0c0" text-anchor="middle" font-weight="600">NH₂ + H  →  NH₃</text>
+        <line x1="120" y1="334" x2="120" y2="364" stroke="#00e0c0" stroke-width="1.5" marker-end="url(#a2)"/>
+        <rect x="26" y="364" width="188" height="36" rx="7" fill="rgba(0,224,192,.07)" stroke="rgba(0,224,192,.28)" stroke-width="1"/>
+        <text x="120" y="378" font-family="DM Sans" font-size="13" fill="#00e0c0" text-anchor="middle" font-weight="600">③ Giải hấp phụ</text>
+        <text x="120" y="394" font-family="DM Sans" font-size="12" fill="#9bbccc" text-anchor="middle">NH₃ rời bề mặt → khí tự do</text>
+        <line x1="120" y1="400" x2="120" y2="430" stroke="#00e0c0" stroke-width="1.5" marker-end="url(#a2)"/>
+        <rect x="40" y="430" width="160" height="46" rx="9" fill="rgba(0,200,220,.2)" stroke="#00c8dc" stroke-width="1.5"/>
+        <text x="120" y="452" font-family="DM Mono" font-size="20" fill="#00c8dc" text-anchor="middle" font-weight="600">NH₃ ↑</text>
+        <text x="120" y="470" font-family="DM Sans" font-size="13" fill="#9bbccc" text-anchor="middle">Outlet → phân tích</text>
+        <rect x="56" y="484" width="128" height="40" rx="7" fill="rgba(240,208,96,.1)" stroke="rgba(240,208,96,.3)" stroke-width="1"/>
+        <text x="120" y="500" font-family="DM Sans" font-size="12" fill="#f0d060" text-anchor="middle">Ru/MCM-41</text>
+        <text x="120" y="518" font-family="DM Sans" font-size="15" fill="#f0d060" text-anchor="middle" font-weight="600">+30% yield</text>
+      </svg>
+    </div>
+  </div>
+  <div class="pg">5 / 8</div>
+</div>
+
+
+<!-- ═══════════════════════════════════════
+  S6 — ƯU ĐIỂM MICROREACTOR
+═══════════════════════════════════════ -->
+<div class="slide" id="s5">
+  <div class="glow" style="width:600px;height:600px;background:rgba(0,200,220,.08);top:-130px;right:-100px;"></div>
+  <div class="glow" style="width:400px;height:400px;background:rgba(0,224,192,.06);bottom:-100px;left:-60px;"></div>
+
+  <div class="lbl a" style="--i:0">Ưu điểm</div>
+  <h2 class="a" style="--i:1;font-size:36px;margin-bottom:16px;">Tại sao dùng <span class="hl">Microreactor</span>?</h2>
+
+  <div style="flex:1;display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr;gap:16px;align-items:stretch;">
+    <div class="c a" style="--i:2;display:flex;flex-direction:column;justify-content:center;gap:12px;padding:24px 24px;">
+      <div style="font-size:40px;">🌡️</div>
+      <div class="ct" style="font-size:12px;letter-spacing:2.5px;">Kiểm soát nhiệt</div>
+      <p style="font-size:17px;line-height:1.65;">Tỷ lệ S/V lớn → tản nhiệt nhanh tự nhiên, tránh quá nhiệt cục bộ.</p>
+    </div>
+    <div class="c a" style="--i:3;display:flex;flex-direction:column;justify-content:center;gap:12px;padding:24px 24px;">
+      <div style="font-size:40px;">⚡</div>
+      <div class="ct" style="font-size:12px;letter-spacing:2.5px;">Tăng cường điện trường</div>
+      <p style="font-size:17px;line-height:1.65;">Discharge gap 0.5 mm–vài mm → điện trường lớn với điện áp vừa phải.</p>
+    </div>
+    <div class="c a" style="--i:4;display:flex;flex-direction:column;justify-content:center;gap:12px;padding:24px 24px;">
+      <div style="font-size:40px;">🎛️</div>
+      <div class="ct" style="font-size:12px;letter-spacing:2.5px;">Kiểm soát dòng khí</div>
+      <p style="font-size:17px;line-height:1.65;">Kích thước micro → kiểm soát nhiệt độ và lưu lượng khí chính xác.</p>
+    </div>
+    <div class="c a" style="--i:5;display:flex;flex-direction:column;justify-content:center;gap:12px;padding:24px 24px;">
+      <div style="font-size:40px;">🔋</div>
+      <div class="ct" style="font-size:12px;letter-spacing:2.5px;">Tích hợp năng lượng tái tạo</div>
+      <p style="font-size:17px;line-height:1.65;">Bật/tắt tức thì → tương thích điện mặt trời, gió; sản xuất NH₃ tại chỗ.</p>
+    </div>
+    <div class="c a" style="--i:6;display:flex;flex-direction:column;justify-content:center;gap:12px;padding:24px 24px;">
+      <div style="font-size:40px;">🛡️</div>
+      <div class="ct" style="font-size:12px;letter-spacing:2.5px;">Vỏ thép không gỉ</div>
+      <p style="font-size:17px;line-height:1.65;">Bền cơ học, chịu ăn mòn từ các hóa chất hoạt tính cao trong plasma.</p>
+    </div>
+    <div class="c a" style="--i:7;display:flex;flex-direction:column;justify-content:center;gap:12px;padding:24px 24px;">
+      <div style="font-size:40px;">🌐</div>
+      <div class="ct" style="font-size:12px;letter-spacing:2.5px;">DBD — Plasma đồng đều</div>
+      <p style="font-size:17px;line-height:1.65;">Hạt MCM-41 phân tán plasma đều khắp buồng, tối đa tiếp xúc xúc tác Ru.</p>
+    </div>
+  </div>
+  <div class="pg">6 / 8</div>
+</div>
+
+
+<!-- ═══════════════════════════════════════
+  S7 — TỐI ƯU HÓA
+═══════════════════════════════════════ -->
+<div class="slide" id="s6">
+  <div class="glow" style="width:600px;height:600px;background:rgba(0,224,192,.09);bottom:-120px;right:20px;"></div>
+  <div class="glow" style="width:450px;height:450px;background:rgba(0,200,220,.07);top:-100px;left:-50px;"></div>
+
+  <div class="lbl a" style="--i:0">Tối ưu hóa</div>
+  <h2 class="a" style="--i:1;font-size:36px;margin-bottom:16px;">Các <span class="hl">Yếu Tố</span> Tối Ưu Hệ Thống</h2>
+
+  <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:stretch;">
+    <!-- LEFT col: 3 factor cards stacked -->
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div class="c a" style="--i:2;flex:1;display:flex;flex-direction:column;justify-content:center;gap:10px;padding:22px 24px;">
+        <div class="ct" style="font-size:12px;margin-bottom:4px;">📡 Tần số điện áp</div>
+        <p style="font-size:20px;"><strong class="ac" style="font-size:26px;">450–500 kHz</strong></p>
+        <p style="color:#9bbccc;font-size:16px;margin-top:4px;line-height:1.6;">Duy trì plasma ổn định liên tục; tần số thấp hơn làm plasma không đều hoặc tắt.</p>
+      </div>
+      <div class="c a" style="--i:3;flex:1;display:flex;flex-direction:column;justify-content:center;gap:10px;padding:22px 24px;">
+        <div class="ct" style="font-size:12px;margin-bottom:4px;">⚗️ Tỷ lệ khí N₂ : H₂</div>
+        <p style="font-size:20px;"><strong>Lý thuyết 1 : 3</strong></p>
+        <p style="color:#9bbccc;font-size:16px;margin-top:4px;line-height:1.6;">Trong plasma, tỷ lệ tối ưu thay đổi tùy xúc tác — cần khảo sát thực nghiệm.</p>
+      </div>
+      <div class="c a" style="--i:4;flex:1;display:flex;flex-direction:column;justify-content:center;gap:10px;padding:22px 24px;">
+        <div class="ct" style="font-size:12px;margin-bottom:4px;">🔮 Vai trò MCM-41</div>
+        <p style="font-size:20px;"><strong>Catalyst support + Dielectric barrier</strong></p>
+        <p style="color:#9bbccc;font-size:16px;margin-top:4px;line-height:1.6;">Phân tán plasma đều khắp buồng, tránh tập trung điểm cục bộ.</p>
+      </div>
+    </div>
+
+    <!-- RIGHT: bar chart + stat grid -->
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <!-- NH₃ Yield title: nằm NGOÀI card biểu đồ, phía trên -->
+      <div class="a" style="--i:5;display:flex;align-items:center;gap:10px;padding:0 4px;">
+        <span style="font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--ac);font-weight:600;">📊 NH₃ Yield</span>
+        <span style="font-size:13px;color:var(--mu);">— Plasma vs Plasma + Ru/MCM-41</span>
+        <span style="flex:1;height:1px;background:linear-gradient(to right,rgba(240,208,96,.3),transparent);"></span>
+      </div>
+      <!-- Card chỉ chứa 2 thanh bar, không có tiêu đề bên trong -->
+      <div class="c a" style="--i:5;flex:1;border-color:rgba(240,208,96,.3);display:flex;flex-direction:column;padding:16px 20px;min-height:0;">
+        <!-- wrapper đặt relative để chứa cả 2 bar trong cùng khung -->
+        <div style="flex:1;position:relative;min-height:0;display:flex;align-items:flex-end;justify-content:center;gap:40px;padding-bottom:0;">
+          <!-- Bar 1: 100% → chiếm 77% chiều cao khung (100/130) -->
+          <div style="width:90px;height:77%;background:linear-gradient(to top,#3a6a7a,#6a9aaa);border-radius:7px 7px 0 0;opacity:.85;animation:barGrow .65s .28s cubic-bezier(.22,.8,.4,1) both;transform-origin:bottom;transform:scaleY(0);"></div>
+          <!-- Bar 2: ~130% → chiếm 100% chiều cao khung -->
+          <div style="width:90px;height:100%;background:linear-gradient(to top,#00c8dc,#00e0c0);border-radius:7px 7px 0 0;opacity:.92;box-shadow:0 0 20px rgba(0,200,220,.40);position:relative;animation:barGrow .65s .52s cubic-bezier(.22,.8,.4,1) both;transform-origin:bottom;transform:scaleY(0);">
+            <div style="position:absolute;top:14px;left:50%;transform:translateX(-50%);background:rgba(240,208,96,.2);border:1px solid rgba(240,208,96,.55);border-radius:6px;padding:5px 12px;white-space:nowrap;">
+              <span style="font-family:var(--mo);font-size:18px;color:#f0d060;font-weight:700;">+30%</span>
+            </div>
+          </div>
+        </div>
+        <!-- baseline -->
+        <div style="display:flex;justify-content:center;gap:40px;margin-top:0;">
+          <div style="width:90px;height:1px;background:rgba(0,210,230,.30);"></div>
+          <div style="width:90px;height:1px;background:rgba(0,210,230,.30);"></div>
+        </div>
+        <!-- labels below bars -->
+        <div style="display:flex;justify-content:center;gap:40px;margin-top:10px;flex-shrink:0;">
+          <div style="width:90px;text-align:center;">
+            <div style="font-family:var(--mo);font-size:16px;color:#9bbccc;font-weight:600;">100%</div>
+            <div style="font-size:13px;color:var(--mu);margin-top:3px;line-height:1.4;">Plasma only</div>
+          </div>
+          <div style="width:90px;text-align:center;">
+            <div style="font-family:var(--mo);font-size:16px;color:#00c8dc;font-weight:700;">~130%</div>
+            <div style="font-size:13px;color:var(--cyan);margin-top:3px;line-height:1.4;">+ Ru/MCM-41</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="c a" style="--i:6;flex:0 0 auto;padding:18px 20px;">
+        <div class="ct" style="font-size:12px;margin-bottom:10px;">Thông số vận hành</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div style="background:rgba(0,200,220,.07);border-radius:9px;padding:15px 18px;">
+            <div style="font-size:13px;color:var(--mu);margin-bottom:5px;">Tần số</div>
+            <div style="font-family:var(--mo);font-size:18px;color:var(--ac);font-weight:600;">450–500 kHz</div>
+          </div>
+          <div style="background:rgba(0,200,220,.07);border-radius:9px;padding:15px 18px;">
+            <div style="font-size:13px;color:var(--mu);margin-bottom:5px;">Discharge gap</div>
+            <div style="font-family:var(--mo);font-size:18px;color:var(--cyan);font-weight:600;">0.5 – vài mm</div>
+          </div>
+          <div style="background:rgba(0,200,220,.07);border-radius:9px;padding:15px 18px;">
+            <div style="font-size:13px;color:var(--mu);margin-bottom:5px;">Tỷ lệ lý thuyết</div>
+            <div style="font-family:var(--mo);font-size:18px;color:var(--cyan);font-weight:600;">N₂ : H₂ = 1:3</div>
+          </div>
+          <div style="background:rgba(0,200,220,.07);border-radius:9px;padding:15px 18px;">
+            <div style="font-size:13px;color:var(--mu);margin-bottom:5px;">Yield tăng thêm</div>
+            <div style="font-family:var(--mo);font-size:18px;color:var(--teal);font-weight:600;">~30%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="pg">7 / 8</div>
+</div>
+
+
+<!-- ═══════════════════════════════════════
+  S8 — KẾT LUẬN
+═══════════════════════════════════════ -->
+<div class="slide" id="s7">
+  <div class="glow" style="width:580px;height:580px;background:rgba(0,200,220,.08);top:-150px;right:-110px;"></div>
+  <div class="glow" style="width:420px;height:420px;background:rgba(0,224,192,.07);bottom:-100px;left:-60px;"></div>
+
+  <div class="lbl a" style="--i:0">Kết luận</div>
+  <h2 class="a" style="--i:1;font-size:34px;">Kết Luận &amp; <span class="hl">Tiềm Năng</span></h2>
+
+  <div class="g55" style="flex:1;">
+    <!-- LEFT: 4 ý chốt + formula -->
+    <div class="col">
+      <div class="c a" style="--i:2;flex:1;padding:18px 20px;">
+        <div class="ct" style="font-size:11px;margin-bottom:12px;">4 ý chốt</div>
+        <ul class="bl" style="gap:12px;">
+          <li style="font-size:16px;line-height:1.55;">Plasma phá liên kết N≡N — năng lượng liên kết <strong class="ac">~945 kJ/mol</strong> — qua <strong>vibrational excitation</strong>, không cần nhiệt độ cao hay áp suất lớn.</li>
+          <li style="font-size:16px;line-height:1.55;">Xúc tác <strong>Ru/MCM-41</strong> hiệp đồng với plasma: hấp phụ → <span style="font-family:var(--mo);font-size:14px;">N+H→NH→NH₂→NH₃</span> → giải hấp phụ.</li>
+          <li style="font-size:16px;line-height:1.55;"><strong>Microreactor DBD</strong> kiểm soát chính xác nhiệt độ, dòng khí và plasma ở <strong class="ac">450–500 kHz</strong>.</li>
+          <li style="font-size:16px;line-height:1.55;">Tích hợp <strong>năng lượng tái tạo</strong> → sản xuất NH₃ tại chỗ, xanh, quy mô nhỏ và phân tán.</li>
+        </ul>
+      </div>
+      <div class="fb a" style="--i:3;font-size:18px;padding:20px 26px;">
+        3H₂ + N₂ ⇌ 2NH₃ &nbsp;|&nbsp; ΔH<sub>298K</sub> = −46.35 kJ/mol
+        <small style="font-size:14px;margin-top:8px;">plasma · DBD · Ru/MCM-41 · microreactor · 450–500 kHz · discharge gap 0.5–vài mm</small>
+      </div>
+    </div>
+
+    <!-- RIGHT: 3 icon cards, each flex:1, bigger padding -->
+    <div class="col">
+      <div class="c a" style="--i:4;flex:1;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:22px 20px;border-color:rgba(0,224,192,.35);">
+        <div style="font-size:40px;">🔬</div>
+        <div class="ct" style="color:var(--teal);font-size:11px;">Hiệp đồng tối ưu</div>
+        <p style="font-size:16px;color:#9bbccc;line-height:1.6;">Plasma + Ru/MCM-41<br>kích hoạt &amp; xúc tác đồng thời</p>
+      </div>
+      <div class="c a" style="--i:5;flex:1;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:22px 20px;">
+        <div style="font-size:40px;">📈</div>
+        <div class="ct" style="font-size:11px;">+30% NH₃ yield</div>
+        <p style="font-size:16px;color:#9bbccc;line-height:1.6;">Ru/MCM-41 so với<br>plasma đơn thuần</p>
+      </div>
+      <div class="c a" style="--i:6;flex:1;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:22px 20px;border-color:rgba(0,200,220,.35);">
+        <div style="font-size:40px;">🌱</div>
+        <div class="ct" style="font-size:11px;">Xanh &amp; phân tán</div>
+        <p style="font-size:16px;color:#9bbccc;line-height:1.6;">Tích hợp năng lượng tái tạo,<br>sản xuất NH₃ tại chỗ</p>
+      </div>
+    </div>
+  </div>
+  <div class="pg">8 / 8</div>
+</div>
+
+
+</div><!-- #stage -->
+
+<!-- ═══ NAV ═══ -->
+<div id="nav">
+  <button class="nb" onclick="go(-1)">◀ Trước</button>
+  <div id="dots"></div>
+  <span id="si">1 / 8</span>
+  <button class="nb" onclick="go(1)">Sau ▶</button>
+</div>
+
+<script>
+const TOTAL=8; let cur=0, busy=false;
+const slides=document.querySelectorAll('.slide');
+const dotsEl=document.getElementById('dots');
+const siEl=document.getElementById('si');
+const stage=document.getElementById('stage');
+
+for(let i=0;i<TOTAL;i++){
+  const d=document.createElement('div');
+  d.className='dot'+(i===0?' on':'');
+  d.onclick=()=>goTo(i);
+  dotsEl.appendChild(d);
+}
+
+function scale(){
+  const vw=window.innerWidth, vh=window.innerHeight-36;
+  const s=Math.min(vw/1280,vh/720);
+  const l=(vw-1280*s)/2, t=(vh-720*s)/2;
+  stage.style.cssText=`width:1280px;height:720px;position:fixed;overflow:hidden;transform:scale(${s});transform-origin:top left;left:${l}px;top:${t}px;`;
+}
+scale(); window.addEventListener('resize',scale);
+
+function goTo(n){
+  if(busy||n===cur) return; busy=true;
+  const prev=cur; cur=(n+TOTAL)%TOTAL;
+  slides[prev].classList.add('exit');
+  slides[prev].classList.remove('active');
+  setTimeout(()=>{
+    slides[prev].classList.remove('exit');
+    slides[cur].classList.add('active');
+    dotsEl.children[prev].classList.remove('on');
+    dotsEl.children[cur].classList.add('on');
+    siEl.textContent=(cur+1)+' / '+TOTAL;
+    busy=false;
+  },400);
+}
+function go(d){goTo(cur+d);}
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||e.key===' ')go(1);
+  if(e.key==='ArrowLeft')go(-1);
+});
+</script>
+</body>
+</html>
